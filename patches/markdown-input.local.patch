@@ -1,0 +1,268 @@
+--- /tmp/mm-input/client.orig.js	2026-10-21 20:52:17
++++ /tmp/merged/client.js	2026-10-21 21:22:25
+@@ -1,5 +1,5 @@
+ window.__ModuleLoader__.load({
+-	id: "dsh-markdown-input",
++	id: "dsh-link-plugin",
+ 	factory: (require) => {
+ 		var module = { exports: {} };
+ 		var exports = module.exports;
+@@ -28887,6 +28887,7 @@
+ 					from: main.to,
+ 					insert: `](${link})`
+ 				}],
++				selection: { anchor: main.to + link.length + 4 },
+ 				userEvent: "input.paste",
+ 				scrollIntoView: true
+ 			});
+@@ -29132,7 +29133,7 @@
+ 					const syntax = node.node;
+ 					const marks = syntax?.getChildren("LinkMark") ?? [];
+ 					if (syntax === null || marks.length < 3 || syntax.getChild("URL") === null) return;
+-					if (touchesActiveLine(doc, active, syntax.from, syntax.to)) return;
++					if (state.selection.ranges.some((r) => r.from > syntax.from && r.from < syntax.to)) return;
+ 					fold(marks[0].from, marks[0].to);
+ 					fold(marks[1].from, syntax.to);
+ 					if (marks[1].from > marks[0].to) ranges.push(Decoration.mark({ class: "cm-md-link" }).range(marks[0].to, marks[1].from));
+@@ -49824,7 +49825,7 @@
+ 		//#endregion
+ 		//#region src/client/index.ts
+ 		/** Required services: slot registry and copy. */
+-		const inject = ["slots", "locale"];
++		const inject = ["slots", "locale", "uiConversation"];
+ 		/**
+ 		* A component value is present when the host module table resolved it at
+ 		* all — `memo`/`forwardRef` wrap the function into an exotic object, so a
+@@ -49926,9 +49927,231 @@
+ 			}, FallbackNotice));
+ 		}
+ 		//#endregion
+-		exports.apply = apply;
++		//#region dsh-link-plugin extras: sent-bubble link rendering + native-composer fallback paste-link
++		/**
++		 * Everything below is the merged-in half of dsh-link-plugin (previously a
++		 * separate plugin): render `[label](url)` inside sent user-message
++		 * bubbles as a brand-icon + underlined label, and — only while the
++		 * markdown takeover has degraded back to the native composer — turn
++		 * "selected text + pasted URL" into a Markdown link.
++		 */
++		const __dshLinkRuleId = "markdown-link";
++		const __dshLinkStyleId = "dsh-link-plugin/link-run.css";
++		const __dshLinkSchemeRe = /^(?:https?:\/\/|mailto:)/iu;
++		const __dshLinkMarkdownRe = /\[([^\[\]\n]*)\]\((<[^>\n]*>|https?:\/\/[^\s()<>]+(?:\([^\s()]*\)[^\s()<>]*)*|mailto:[^\s()<>]+)\)/gu;
++		function __dshLinkNormalizeUrl(value) {
++			if (typeof value !== "string") return void 0;
++			const url = value.trim();
++			if (url === "" || /\s/u.test(url)) return void 0;
++			if (!__dshLinkSchemeRe.test(url)) return void 0;
++			if (typeof URL === "function") try {
++				new URL(url);
++			} catch {
++				return void 0;
++			}
++			return url;
++		}
++		function __dshLinkNext(text, from) {
++			__dshLinkMarkdownRe.lastIndex = from;
++			const match = __dshLinkMarkdownRe.exec(text);
++			if (match === null) return void 0;
++			const rawDestination = match[2];
++			const destination = rawDestination.startsWith("<") ? rawDestination.slice(1, -1) : rawDestination;
++			const url = __dshLinkNormalizeUrl(destination);
++			if (url === void 0) return void 0;
++			return {
++				start: match.index,
++				end: match.index + match[0].length,
++				label: match[1].replace(/\\([\\[\]])/gu, "$1"),
++				url
++			};
++		}
++		function __dshLinkInstallStyles() {
++			if (typeof document === "undefined") return;
++			if (document.querySelector(`style[data-plugin-css="${__dshLinkStyleId}"]`) !== null) return;
++			const tag = document.createElement("style");
++			tag.dataset.plugin = "dsh-link-plugin";
++			tag.dataset.pluginCss = __dshLinkStyleId;
++			tag.textContent = ".dsh-mdlink{color:inherit;text-decoration:none;white-space:normal;overflow-wrap:anywhere}a.dsh-mdlink:hover .dsh-mdlink-label{text-decoration-color:currentColor}.dsh-mdlink-icon{width:14px;min-width:14px;height:14px;margin-right:4px;vertical-align:-2px;opacity:.8}.dsh-mdlink-label{text-decoration:underline;text-decoration-color:color-mix(in srgb,currentColor 45%,transparent);text-underline-offset:2px}";
++			document.head.appendChild(tag);
++		}
++		const __dshLinkRule = {
++			id: __dshLinkRuleId,
++			order: 500,
++			match(text, from) {
++				const found = __dshLinkNext(text, from);
++				if (found === void 0) return void 0;
++				return {
++					id: __dshLinkRuleId,
++					start: found.start,
++					end: found.end,
++					data: {
++						label: found.label,
++						url: found.url
++					}
++				};
++			}
++		};
++		function __dshLinkRenderNode(props) {
++			const node = props.node;
++			const data = node !== null && node !== void 0 && typeof node.data === "object" && node.data !== null ? node.data : {};
++			const raw = typeof props.raw === "string" ? props.raw : "";
++			const url = __dshLinkNormalizeUrl(data.url);
++			if (url === void 0) return react.createElement(_deepseek_ai_dsh_client_ui_primitives.UserTextRun, { text: raw });
++			const label = typeof data.label === "string" && data.label !== "" ? data.label : url;
++			const icon = react.createElement(_deepseek_ai_dsh_client_ui_primitives.LinkIconMedium, {
++				kind: "url",
++				href: url,
++				size: 14,
++				className: "dsh-mdlink-icon"
++			});
++			const text = react.createElement("span", {
++				className: "dsh-mdlink-label",
++				title: url
++			}, label);
++			if (props.interactive !== true) return react.createElement("span", {
++				className: "dsh-mdlink",
++				title: raw
++			}, icon, text);
++			return react.createElement("a", {
++				className: "dsh-mdlink",
++				href: url,
++				target: "_blank",
++				rel: "noopener noreferrer",
++				title: raw
++			}, icon, text);
++		}
++		function __dshLinkPastedUrl(clipboardData) {
++			if (clipboardData === null || clipboardData === void 0) return void 0;
++			const items = Array.from(clipboardData.items ?? []);
++			if (items.some((item) => item.kind === "file")) return void 0;
++			const read = (type) => {
++				try {
++					return clipboardData.getData(type) ?? "";
++				} catch {
++					return "";
++				}
++			};
++			const fromPlain = __dshLinkNormalizeUrl(read("text/plain"));
++			if (fromPlain !== void 0) return fromPlain;
++			for (const line of read("text/uri-list").split(/\r?\n/u)) {
++				const trimmed = line.trim();
++				if (trimmed === "" || trimmed.startsWith("#")) continue;
++				const candidate = __dshLinkNormalizeUrl(trimmed);
++				if (candidate !== void 0) return candidate;
++			}
++			const html = read("text/html");
++			if (html !== "" && typeof DOMParser === "function") try {
++				const anchor = new DOMParser().parseFromString(html, "text/html").querySelector("a[href]");
++				const candidate = anchor === null ? void 0 : __dshLinkNormalizeUrl(anchor.getAttribute("href") ?? "");
++				if (candidate !== void 0) return candidate;
++			} catch {
++			}
++			return void 0;
++		}
++		function __dshLinkMarkdown(selectedText, url) {
++			const label = selectedText.replace(/\s+/gu, " ").trim().replace(/[\\[\]]/gu, (character) => `\\${character}`);
++			const destination = /[\s()<>]/u.test(url) ? `<${url.replace(/</gu, "%3C").replace(/>/gu, "%3E")}>` : url;
++			return `[${label}](${destination})`;
++		}
++		function __dshLinkDetectText(inputState) {
++			const draft = typeof inputState.draft === "string" ? inputState.draft : "";
++			const occurrences = Array.isArray(inputState.occurrences) ? inputState.occurrences : [];
++			if (occurrences.length === 0) return draft;
++			let text = "";
++			let cursor = 0;
++			for (const occurrence of occurrences) {
++				const offset = occurrence.offset;
++				const length = occurrence.length;
++				if (!Number.isInteger(offset) || !Number.isInteger(length) || offset < cursor || length < 0) return void 0;
++				text += `${draft.slice(cursor, offset)}\uFFFC`;
++				cursor = offset + length;
++			}
++			return text + draft.slice(cursor);
++		}
++		function __dshLinkEditorRoot(card) {
++			return card.querySelector("[data-composer-input]") ?? card.querySelector('[data-lexical-editor="true"]');
++		}
++		function __dshLinkHandlePaste(event, host, stateRef, actionsRef) {
++			if (event.defaultPrevented || host === null || host === void 0) return;
++			const card = host.closest("[data-composer-card]");
++			if (card === null) return;
++			const target = event.target;
++			if (!(target instanceof Element) || !card.contains(target)) return;
++			const editor = __dshLinkEditorRoot(card);
++			if (editor === null || !editor.contains(target)) return;
++			if (editor.getAttribute("contenteditable") === "false") return;
++			const actions = actionsRef.current;
++			const inputState = stateRef.current;
++			if (actions === void 0 || inputState === void 0) return;
++			if (inputState.phase !== "plain" && inputState.phase !== "claimed") return;
++			const url = __dshLinkPastedUrl(event.clipboardData);
++			if (url === void 0) return;
++			const selection = window.getSelection();
++			if (selection === null || selection.rangeCount === 0 || selection.isCollapsed) return;
++			if (!editor.contains(selection.anchorNode) || !editor.contains(selection.focusNode)) return;
++			const selectedText = selection.toString();
++			if (selectedText.trim() === "") return;
++			const detectText = __dshLinkDetectText(inputState);
++			if (detectText === void 0) return;
++			const span = actions.captureInsertion();
++			if (span.start === span.end) return;
++			if (detectText.slice(span.start, span.end) !== selectedText) return;
++			if (!actions.insertText(__dshLinkMarkdown(selectedText, url), span)) return;
++			event.preventDefault();
++			event.stopPropagation();
++		}
++		function __dshLinkPasteAnchor(props) {
++			const inputActions = props.inputActions;
++			const input = props.useInput((state) => state);
++			const hostRef = react.useRef(null);
++			const stateRef = react.useRef(input);
++			const actionsRef = react.useRef(inputActions);
++			stateRef.current = input;
++			actionsRef.current = inputActions;
++			react.useEffect(() => {
++				const listener = (event) => {
++					__dshLinkHandlePaste(event, hostRef.current, stateRef, actionsRef);
++				};
++				document.addEventListener("paste", listener, true);
++				return () => {
++					document.removeEventListener("paste", listener, true);
++				};
++			}, []);
++			return react.createElement("span", {
++				ref: hostRef,
++				hidden: true,
++				"data-dsh-mdlink-anchor": ""
++			});
++		}
++		function __dshLinkInstall(ctx) {
++			__dshLinkInstallStyles();
++			ctx.uiConversation.userText.register(__dshLinkRule);
++			ctx.slots.inject("conversation.user.text.node", () => ctx.slots.register({
++				name: "conversation.user.text.node",
++				key: __dshLinkRuleId,
++				priority: 100
++			}, __dshLinkRenderNode));
++			ctx.slots.inject("conversation.input.overlay", () => ctx.slots.register({
++				name: "conversation.input.overlay",
++				id: "link-paste-fallback",
++				order: 100
++			}, __dshLinkPasteAnchor));
++		}
++		const __dshLinkBaseApply = apply;
++		function __dshLinkApply(ctx) {
++			__dshLinkBaseApply(ctx);
++			try {
++				__dshLinkInstall(ctx);
++			} catch (error) {
++				console.error("[dsh-link-plugin] link extras failed", error);
++			}
++		}
++		//#endregion
++		exports.apply = __dshLinkApply;
+ 		exports.inject = inject;
+ 		exports.userMessageCapability = userMessageCapability;
++		exports.__dshLinkInstall = __dshLinkInstall;
+ 		return module.exports;
+ 	}
+ });

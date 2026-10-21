@@ -1,0 +1,14 @@
+# Bundle patch for dsh-link-plugin.
+#
+# The profile launcher applies this file when `dsh-link-plugin` appears in the
+# profile package.json `dsh.profile.bundles` list. The inserted Loader row is
+# the package's host half (`lib/index.js`, a no-op); its only job is to be an
+# ENABLED Loader entry, because @deepseek-ai/dsh-client-modules discovers
+# browser bundles by scanning enabled Loader entries and reading each
+# package's `dsh.client` declaration from package.json.
+#
+# Keep `id` unique across the composition; keep `name` exactly the package
+# name (the Loader resolves it through the profile's node_modules).
+- insert:
+    - id: markdown-link
+      name: dsh-link-plugin

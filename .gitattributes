@@ -1,0 +1,3 @@
+lib/client.js linguist-generated=true
+patches/markdown-input.local.patch linguist-generated=true
+patches/dsh-link-plugin.extras.js linguist-generated=false
