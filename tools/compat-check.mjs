@@ -937,7 +937,7 @@ function checkInstall(pluginDir, pluginPkg, opts, runtimeVersion, addCheck) {
       'location',
       declared ? 'FAIL' : 'WARN',
       declared
-        ? `profile declares bundle "${pkgName}" but ${prettyPath(path.join(opts.profileDir, 'node_modules', pkgName))} is missing -- the app cannot load the plugin; run "pnpm install" in ${prettyPath(opts.profileDir)} (or reinstall the bundle)`
+        ? `profile declares bundle "${pkgName}" but ${prettyPath(path.join(opts.profileDir, 'node_modules', pkgName))} is missing -- the app cannot load the plugin; run "rm -rf node_modules/${pkgName} && pnpm install" in ${prettyPath(opts.profileDir)} (pnpm may skip an unchanged file: dep), or reinstall the bundle`
         : `plugin "${pkgName}" is not installed in this profile (fine if the app uses another profile; override with --profile-dir)`,
     )
     return info
@@ -978,7 +978,7 @@ function checkInstall(pluginDir, pluginPkg, opts, runtimeVersion, addCheck) {
       'install',
       'client-js',
       'WARN',
-      `installed lib/client.js is STALE (sha256 ${installedHash.slice(0, 12)}... vs repo ${(repoHash || 'missing').slice(0, 12)}...) -- the app keeps loading the old code; run "pnpm install" in ${prettyPath(opts.profileDir)} (or reinstall the bundle)`,
+      `installed lib/client.js is STALE (sha256 ${installedHash.slice(0, 12)}... vs repo ${(repoHash || 'missing').slice(0, 12)}...) -- the app keeps loading the old code; run "rm -rf node_modules/${pkgName} && pnpm install" in ${prettyPath(opts.profileDir)} (pnpm may skip an unchanged file: dep), or reinstall the bundle`,
     )
   }
 
@@ -1464,7 +1464,7 @@ function buildNextAction(report) {
     }
     const installFail = failing.find((check) => check.group === 'install')
     if (installFail) {
-      return `make the live profile match the repo: cd ${prettyPath(report.profile.dir)} && pnpm install (or reinstall the bundle), then re-run.`
+      return `make the live profile match the repo: cd ${prettyPath(report.profile.dir)} && rm -rf node_modules/dsh-link-plugin && pnpm install (or reinstall the bundle), then re-run.`
     }
     return 'fix the failing checks above, then re-run: node tools/compat-check.mjs'
   }
@@ -1472,7 +1472,7 @@ function buildNextAction(report) {
   if (report.verdict === 'DEGRADED') {
     const stale = warning && (warning.id === 'location' || warning.id === 'client-js' || warning.id === 'manifest' || warning.id === 'bundle-patch' || warning.id === 'engine')
     if (stale && report.profile.dir) {
-      return `all hard compatibility checks pass; sync the stale live profile copy: run "pnpm install" in ${prettyPath(report.profile.dir)} (or reinstall the bundle), then relaunch DSH.`
+      return `all hard compatibility checks pass; sync the stale live profile copy: cd ${prettyPath(report.profile.dir)} && rm -rf node_modules/dsh-link-plugin && pnpm install (or reinstall the bundle), then relaunch DSH.`
     }
     if (warning && warning.group === 'resilience') {
       return 'all hard compatibility checks pass; remove the declared @deepseek-ai host imports from lib/client.js to make the plugin upgrade-proof.'

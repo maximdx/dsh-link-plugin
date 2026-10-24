@@ -69,8 +69,10 @@ Exit codes: `0` PASS or DEGRADED (warnings only), `1` FAIL, `2` bad CLI usage.
    `package.json` (`name` / `version` / `dsh.client` / `engines.dsh`) and the
    bundle patch against the installed profile copy
    (`<profile>/node_modules/<pkg>` or `<profile>/plugins/<pkg>`). A stale copy
-   means the app keeps loading old code: sync it with `pnpm install` in the
-   profile (or reinstall the bundle) and relaunch DSH.
+   means the app keeps loading old code: sync it with
+   `cd <profile> && rm -rf node_modules/dsh-link-plugin && pnpm install`
+   (plain `pnpm install` can consider an unchanged `file:` dep already up to
+   date and skip the copy), or reinstall the bundle, then relaunch DSH.
 5. **Upgrade resilience** — scans `lib/client.js` for runtime imports. The
    target is **zero** `@deepseek-ai` host imports: undeclared non-seed ones are
    failures, declared ones are warnings. `react` / `react-dom` are seed-allowed.
@@ -91,8 +93,10 @@ Exit codes: `0` PASS or DEGRADED (warnings only), `1` FAIL, `2` bad CLI usage.
 1. Read the FAIL rows: manifest failures are fixed in `package.json`; surface
    failures mean the DSH host API changed and `lib/client.js` must be re-ported
    against the new bundles.
-2. Fix the cause, then **reinstall the profile copy** (`pnpm install` in
-   `~/.dsh/profiles/desktop`, or reinstall the bundle) — otherwise the app
-   keeps running the stale copy the checker warns about.
+2. Fix the cause, then **reinstall the profile copy**
+   (`cd ~/.dsh/profiles/desktop && rm -rf node_modules/dsh-link-plugin && pnpm install`,
+   or reinstall the bundle) — otherwise the app keeps running the stale copy
+   the checker warns about. Plain `pnpm install` alone may skip an unchanged
+   `file:` dependency.
 3. Re-run `node tools/compat-check.mjs --json` (JSON is convenient for CI or
    for attaching to an upgrade report).

@@ -74,13 +74,21 @@ cd ~/.dsh/profiles/<profile> && pnpm install
 ```
 
 Or ask the DSH agent to install this directory as a bundle
-(`plugin_manager` → `install_bundle` with the absolute directory).
+(`plugin_manager` → `install_bundle` with the absolute directory) — that path
+handles the package and profile copy for you.
 
 > **Replacing an existing install:** the profile keeps its own copy of the
-> package under `node_modules/`. After editing/replacing the plugin directory,
-> re-run `pnpm install` in the profile (or reinstall the bundle). A stale copy
-> keeps loading old JavaScript and is exactly what `tools/compat-check.mjs`
-> flags.
+> package under `node_modules/`. pnpm can consider an unchanged `file:` spec
+> "already up to date" and leave that stale copy in place, so after
+> editing/replacing the plugin directory use the precise refresh:
+>
+> ```sh
+> cd ~/.dsh/profiles/<profile>
+> rm -rf node_modules/dsh-link-plugin && pnpm install
+> ```
+>
+> A stale copy keeps loading old JavaScript and is exactly what
+> `tools/compat-check.mjs` flags.
 
 ## Verification
 
@@ -125,8 +133,8 @@ It is developer tooling only and is not shipped inside the plugin package.
 2. **PASS** → 插件继续工作（不会再因为版本号被 DSH 直接禁用）。
 3. **MISSING xxx** → 只列出宿主改了哪个接口；插件仍能加载，受影响的功能会自我禁用并在控制台打印
    `[dsh-link-plugin]` 警告，不会白屏、不会拖垮输入框。按报告改 `lib/client.js` 中对应的一个注册点即可。
-4. 如果改过 `lib/client.js`，记得在 profile 目录执行 `pnpm install` 刷新副本；
-   `compat-check` 会检测“profile 里还是旧代码”。
+4. 如果改过 `lib/client.js`，在 profile 目录执行 `rm -rf node_modules/dsh-link-plugin && pnpm install`
+   刷新副本（只跑 `pnpm install` 可能被判为“已是最新”而跳过）；`compat-check` 会检测“profile 里还是旧代码”。
 
 ## File map
 
