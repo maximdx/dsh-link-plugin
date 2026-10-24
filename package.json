@@ -1,7 +1,7 @@
 {
   "name": "dsh-link-plugin",
-  "version": "0.2.0",
-  "description": "Merged DSH composer plugin: CodeMirror Markdown takeover composer with paste-URL-as-link, plus brand-icon+underline rendering of Markdown links in sent user messages (and a native-composer paste fallback).",
+  "version": "0.3.0",
+  "description": "Link handling for the DSH composer and chat: paste a URL over selected text to get one undoable inline Markdown link, and render [label](url) in sent user messages as a site icon plus underlined label. Link-only and built with no host client-package imports, so DSH upgrades degrade a feature instead of disabling the plugin.",
   "license": "MIT",
   "private": true,
   "type": "module",
@@ -20,7 +20,8 @@
     "cordis.patch.yml",
     "README.md",
     "LICENSE",
-    "THIRD_PARTY_NOTICES.md"
+    "THIRD_PARTY_NOTICES.md",
+    "tools"
   ],
   "dsh": {
     "bundle": {
@@ -28,17 +29,14 @@
     },
     "client": {
       "platform": "web",
-      "inject": [
-        "@deepseek-ai/dsh-client-locale",
-        "@deepseek-ai/dsh-client-ui-chat",
-        "@deepseek-ai/dsh-client-ui-conversation",
-        "@deepseek-ai/dsh-client-ui-primitives",
-        "@deepseek-ai/dsh-client-ui-slots"
-      ]
+      "inject": []
     }
   },
+  "scripts": {
+    "verify": "node tools/compat-check.mjs",
+    "test": "node tests/smoke.mjs"
+  },
   "engines": {
-    "node": ">=20",
-    "dsh": "0.2.1-rc.2"
+    "node": ">=20"
   }
 }
